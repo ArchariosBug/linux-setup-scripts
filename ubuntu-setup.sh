@@ -111,26 +111,58 @@ fi
 # Backup original file
 cp "$NETPLAN_PATH" "${NETPLAN_PATH}.bak"
 
-# A. Remove OLD IP lines (Safe: just removes lines matching the specific IP pattern if they exist)
-# We look for lines starting with spaces and a dash, followed by 10.1.200 (the old IP pattern)
-# This is safer than range matching
-sed -i '/^[[:space:]]*- 10\.1\.200\./d' "$NETPLAN_PATH"
+# A. Ensure dhcp4 is set to 'no'
+# If 'dhcp4: yes' exists, change it to 'no'. If 'dhcp4: no' exists, do nothing.
+# This handles cases where DHCP was enabled.
+if grep -q "dhcp4: yes" "$NETPLAN_PATH"; then
+    sudo sed -i 's/dhcp4: yes/dhcp4: no/' "$NETPLAN_PATH"
+    echo "  -> Disabled DHCP4."
+elif ! grep -q "dhcp4: no" "$NETPLAN_PATH"; then
+    # If neither exists, insert it under the interface
+    sudo sed -i "/$INTERFACE_NAME:/a\      dhcp4: no" "$NETPLAN_PATH"
+    echo "  -> Added dhcp4: no."
+fi
 
-# B. Remove OLD Route lines
-# This removes lines containing "via: 10.1.200.1" or "to: default" if they are old routes
-sed -i '/via: 10\.1\.200\.1/d' "$NETPLAN_PATH"
-sed -i '/to: default/d' "$NETPLAN_PATH"
+# B. Remove OLD IP lines (Pattern: lines starting with spaces, dash, then 10.1.200)
+sudo sed -i '/^[[:space:]]*- 10\.1\.200\./d' "$NETPLAN_PATH"
 
-# C. Insert New IP
-NEW_ADDRESS="      - 10.1.200.$YYY/23"
-# Insert after the line 'addresses:' inside the eth0 block
-# We use a simple match for 'addresses:' which is unique enough in this context
-sed -i "/^      addresses:/a $NEW_ADDRESS" "$NETPLAN_PATH"
+# C. Remove OLD Route lines
+sudo sed -i '/via: 10\.1\.200\.1/d' "$NETPLAN_PATH"
+sudo sed -i '/to: default/d' "$NETPLAN_PATH"
 
-# D. Insert New Route
-# We need to insert the route block under 'routes:'
-# Since 'routes:' might have empty brackets [], we insert after the 'routes:' line
-sed -i "/^      routes:/a\        - to: default\n        via: 10.1.200.1" "$NETPLAN_PATH"
+# D. Handle 'addresses' section
+# Check if 'addresses:' line exists
+if grep -q "^      addresses:" "$NETPLAN_PATH"; then
+    # Line exists, insert IP after it
+    NEW_ADDRESS="      - $TARGET_IP/23"
+    sudo sed -i "/^      addresses:/a $NEW_ADDRESS" "$NETPLAN_PATH"
+else
+    # Line does not exist, we need to insert it.
+    # We insert 'addresses:' and the IP right after the 'dhcp4: no' line (or interface name if dhcp4 is missing)
+    # Strategy: Insert after 'dhcp4: no'
+    if grep -q "dhcp4: no" "$NETPLAN_PATH"; then
+        sudo sed -i "/dhcp4: no/a\      addresses:\n        - $TARGET_IP/23" "$NETPLAN_PATH"
+    else
+        # Fallback: insert after interface name
+        sudo sed -i "/$INTERFACE_NAME:/a\      dhcp4: no\n      addresses:\n        - $TARGET_IP/23" "$NETPLAN_PATH"
+    fi
+    echo "  -> Created 'addresses' section."
+fi
+
+# E. Handle 'routes' section
+# Check if 'routes:' line exists
+if grep -q "^      routes:" "$NETPLAN_PATH"; then
+    # Line exists, insert gateway after it
+    sudo sed -i "/^      routes:/a\        - to: default\n        via: $GATEWAY" "$NETPLAN_PATH"
+else
+    # Line does not exist, insert it after 'addresses' (or dhcp4 if addresses missing)
+    if grep -q "^      addresses:" "$NETPLAN_PATH"; then
+        sudo sed -i "/^      addresses:/a\      routes:\n        - to: default\n        via: $GATEWAY" "$NETPLAN_PATH"
+    else
+        sudo sed -i "/dhcp4: no/a\      routes:\n        - to: default\n        via: $GATEWAY" "$NETPLAN_PATH"
+    fi
+    echo "  -> Created 'routes' section."
+fi
 
 echo "[OK] Netplan config updated with IP 10.1.200.$YYY/23"
 
