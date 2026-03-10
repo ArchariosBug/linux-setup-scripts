@@ -74,27 +74,26 @@ GATEWAY="      via: 10.1.200.1"
 # Backup original file
 cp "$NETPLAN_PATH" "${NETPLAN_PATH}.bak"
 
-# Logic to update the IP and Gateway in the specific interface block
-# This sed command finds the line starting with the interface name, 
-# then looks ahead to update the addresses and routes.
-# A simpler approach for strict replacement if the file structure is known:
+# A. Remove OLD IP lines (Safe: just removes lines matching the specific IP pattern if they exist)
+# We look for lines starting with spaces and a dash, followed by 10.1.200 (the old IP pattern)
+# This is safer than range matching
+sed -i '/^[[:space:]]*- 10\.1\.200\./d' "$NETPLAN_PATH"
 
-# Remove existing IP lines under the specific interface (if any)
-# This is a safe way to ensure we don't have duplicates
-sed -i "/$INTERFACE_NAME:/,/routes:/ { /addresses:/ { n; /^[ ]*- /d; } }" "$NETPLAN_PATH"
+# B. Remove OLD Route lines
+# This removes lines containing "via: 10.1.200.1" or "to: default" if they are old routes
+sed -i '/via: 10\.1\.200\.1/d' "$NETPLAN_PATH"
+sed -i '/to: default/d' "$NETPLAN_PATH"
 
-# Remove existing route lines under the specific interface (if any)
-sed -i "/$INTERFACE_NAME:/,/dhcp4:/ { /routes:/ { n; /^[ ]*- /d; } }" "$NETPLAN_PATH"
+# C. Insert New IP
+NEW_ADDRESS="      - 10.1.200.$YYY/23"
+# Insert after the line 'addresses:' inside the eth0 block
+# We use a simple match for 'addresses:' which is unique enough in this context
+sed -i "/^      addresses:/a $NEW_ADDRESS" "$NETPLAN_PATH"
 
-# Append the new IP address after the "addresses:" line within the eth0 block
-# We use a multi-line sed approach to ensure we insert it in the correct hierarchy
-# If the file is complex, a Python/Perl script is safer, but here is a robust sed approach:
-
-# Insert the new IP line after 'addresses:'
-sed -i "/$INTERFACE_NAME:/,/routes:/ { /^      addresses:/a\      $NEW_ADDRESS" "$NETPLAN_PATH"
-
-# Insert the new route line after 'routes:'
-sed -i "/$INTERFACE_NAME:/,/^network:/ { /^      routes:/a\        - to: default\n$GATEWAY" "$NETPLAN_PATH"
+# D. Insert New Route
+# We need to insert the route block under 'routes:'
+# Since 'routes:' might have empty brackets [], we insert after the 'routes:' line
+sed -i "/^      routes:/a\        - to: default\n        via: 10.1.200.1" "$NETPLAN_PATH"
 
 echo "[OK] Netplan config updated with IP 10.1.200.$YYY/23"
 
