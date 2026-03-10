@@ -114,8 +114,8 @@ cp "$NETPLAN_PATH" "${NETPLAN_PATH}.bak"
 # A. Ensure dhcp4 is set to 'no'
 # If 'dhcp4: yes' exists, change it to 'no'. If 'dhcp4: no' exists, do nothing.
 # This handles cases where DHCP was enabled.
-if grep -q "dhcp4: yes" "$NETPLAN_PATH"; then
-    sudo sed -i 's/dhcp4: yes/dhcp4: no/' "$NETPLAN_PATH"
+if grep -q "dhcp4: true" "$NETPLAN_PATH"; then
+    sudo sed -i 's/dhcp4: true/dhcp4: no/' "$NETPLAN_PATH"
     echo "  -> Disabled DHCP4."
 elif ! grep -q "dhcp4: no" "$NETPLAN_PATH"; then
     # If neither exists, insert it under the interface
