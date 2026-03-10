@@ -149,21 +149,6 @@ else
     echo "  -> Created 'addresses' section."
 fi
 
-# E. Handle 'routes' section
-# Check if 'routes:' line exists
-if grep -q "^      routes:" "$NETPLAN_PATH"; then
-    # Line exists, insert gateway after it
-    sudo sed -i "/^      routes:/a\        - to: default\n        via: $GATEWAY" "$NETPLAN_PATH"
-else
-    # Line does not exist, insert it after 'addresses' (or dhcp4 if addresses missing)
-    if grep -q "^      addresses:" "$NETPLAN_PATH"; then
-        sudo sed -i "/^      addresses:/a\      routes:\n        - to: default\n        via: $GATEWAY" "$NETPLAN_PATH"
-    else
-        sudo sed -i "/dhcp4: no/a\      routes:\n        - to: default\n        via: $GATEWAY" "$NETPLAN_PATH"
-    fi
-    echo "  -> Created 'routes' section."
-fi
-
 echo "[OK] Netplan config updated with IP 10.1.200.$YYY/23"
 
 # 6. Apply Netplan
