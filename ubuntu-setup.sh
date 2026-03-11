@@ -43,28 +43,26 @@ echo "=========================================="
 
 # 1. Set Hostname Permanently
 echo "[Step 1] Setting hostname to: $NEW_HOSTNAME"
-# Update /etc/hostname
-echo "$NEW_HOSTNAME" | sudo tee /etc/hostname > /dev/null
-# Update /etc/hosts (Replace localhost entry or add new entry)
-# We ensure the hostname resolves to 127.0.1.1 or the new IP
-if grep -q "localhost" /etc/hosts; then
-    # Backup current hosts
-    sudo cp /etc/hosts /etc/hosts.bak
-    # Replace the line containing the old hostname with the new one, or add it if missing
-    # Strategy: Remove any line with the OLD hostname (if known) and add the new one.
-    # Since we don't know the OLD hostname easily, we append the new mapping to 127.0.1.1
-    # Or better: Update the line that maps 127.0.1.1 to the hostname
-    sudo sed -i "s/127.0.1.1 .*/127.0.1.1       $NEW_HOSTNAME $NEW_HOSTNAME.localdomain/" /etc/hosts
-    # If the line doesn't exist, we add it
-    if ! grep -q "$NEW_HOSTNAME" /etc/hosts; then
-        echo "127.0.1.1       $NEW_HOSTNAME $NEW_HOSTNAME.localdomain" | sudo tee -a /etc/hosts > /dev/null
-    fi
+
+# Get current hostname
+OLD_HOSTNAME=$(hostname)
+
+# Backup hosts file
+sudo cp /etc/hosts /etc/hosts.bak
+
+# Update /etc/hosts (replace old hostname with new hostname)
+if grep -q "$OLD_HOSTNAME" /etc/hosts; then
+    sudo sed -i "s/$OLD_HOSTNAME/$NEW_HOSTNAME/g" /etc/hosts
 else
-    echo "127.0.1.1       $NEW_HOSTNAME $NEW_HOSTNAME.localdomain" | sudo tee -a /etc/hosts > /dev/null
+    echo "127.0.1.1 $NEW_HOSTNAME $NEW_HOSTNAME.localdomain" | sudo tee -a /etc/hosts > /dev/null
 fi
 
-# Apply hostname immediately (optional, reboot is safer but this works for current session)
+# Update /etc/hostname
+echo "$NEW_HOSTNAME" | sudo tee /etc/hostname > /dev/null
+
+# Apply hostname immediately
 sudo hostnamectl set-hostname "$NEW_HOSTNAME"
+
 echo "[OK] Hostname updated."
 
 # 2. Modify SSH Config (PermitRootLogin yes)
