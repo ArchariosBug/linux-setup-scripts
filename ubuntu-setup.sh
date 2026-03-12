@@ -107,7 +107,6 @@ network:
     $INTERFACE_NAME:
       dhcp4: no
       addresses: []
-      routes: []
 EOF
 fi
 
