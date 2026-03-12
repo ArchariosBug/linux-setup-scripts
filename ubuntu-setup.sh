@@ -12,6 +12,7 @@ SSH_CONFIG="/etc/ssh/sshd_config"
 CLOUD_INIT_FLAG="/etc/cloud/cloud-init.disabled"
 RESOLVED_CONF="/etc/systemd/resolved.conf"
 DNS_SERVER="10.1.200.241"
+GATEWAY_IP="10.1.200.1"
 
 # --- Argument Validation ---
 if [ -z "$1" ] || [ -z "$2" ]; then
@@ -31,13 +32,12 @@ if ! [[ "$YYY" =~ ^[0-9]+$ ]]; then
 fi
 
 TARGET_IP="10.1.200.$YYY"
-GATEWAY="10.1.200.1"
 
 echo "=========================================="
 echo "Starting Configuration Script"
 echo "New Hostname: $NEW_HOSTNAME"
 echo "New IP Address: $TARGET_IP/23"
-echo "Gateway: $GATEWAY"
+echo "Gateway: $GATEWAY_IP"
 echo "DNS: $DNS_SERVER"
 echo "=========================================="
 
@@ -67,6 +67,8 @@ echo "[OK] Hostname updated."
 
 # 2. Modify SSH Config (PermitRootLogin yes)
 # Checks if the line exists, if not adds it; if it exists, ensures it is set to 'yes'
+echo "[Step 2] Modify SSH Config to allow root login"
+
 if grep -q "^PermitRootLogin" "$SSH_CONFIG"; then
     sed -i 's/^PermitRootLogin.*/PermitRootLogin yes/' "$SSH_CONFIG"
 else
@@ -75,10 +77,12 @@ fi
 echo "[OK] SSH Config updated."
 
 # 3. Disable Cloud Init
+echo "[Step 3] Disabling cloud-init"
 sudo touch "$CLOUD_INIT_FLAG"
 echo "[OK] Cloud-init disabled."
 
 # 4. Configure DNS (systemd-resolved)
+echo "[Step 4] Setting DNS server to: $DNS_SERVER"
 if grep -q "^DNS=" "$RESOLVED_CONF"; then
     sudo sed -i 's/^DNS=.*/DNS='$DNS_SERVER'/' "$RESOLVED_CONF"
 else
@@ -88,6 +92,7 @@ echo "[OK] Resolved.conf updated."
 sudo systemctl restart systemd-resolved
 
 # 5. Configure Network (Netplan)
+echo "[Step 5] Configuring IP, DHCP and routes"
 NETPLAN_PATH="${NETPLAN_DIR}${NETPLAN_FILE}"
 
 # Check if the netplan file exists, if not create it
@@ -128,7 +133,15 @@ sudo sed -i '/^[[:space:]]*- 10\.1\.200\./d' "$NETPLAN_PATH"
 sudo sed -i '/via: 10\.1\.200\.1/d' "$NETPLAN_PATH"
 sudo sed -i '/to: default/d' "$NETPLAN_PATH"
 
-# D. Handle 'addresses' section
+# D. adding new default route
+if ! ip route | grep -q default; then
+    echo "Default route missing. Adding gateway $GATEWAY_IP ..."
+    sudo ip route add default via $GATEWAY_IP dev $INTERFACE_NAME
+else
+    echo "Default route already exists."
+fi
+
+# E. Handle 'addresses' section
 # Check if 'addresses:' line exists
 if grep -q "^      addresses:" "$NETPLAN_PATH"; then
     # Line exists, insert IP after it
@@ -146,6 +159,7 @@ else
     fi
     echo "  -> Created 'addresses' section."
 fi
+
 
 echo "[OK] Netplan config updated with IP 10.1.200.$YYY/23"
 
