@@ -52,16 +52,16 @@ sudo cp /etc/hosts /etc/hosts.bak
 
 # Update /etc/hosts (replace old hostname with new hostname)
 if grep -q "$OLD_HOSTNAME" /etc/hosts; then
-    sudo sed -i "s/$OLD_HOSTNAME/$NEW_HOSTNAME/g" /etc/hosts
+    sed -i "s/$OLD_HOSTNAME/$NEW_HOSTNAME/g" /etc/hosts
 else
-    echo "127.0.1.1 $NEW_HOSTNAME $NEW_HOSTNAME.localdomain" | sudo tee -a /etc/hosts > /dev/null
+    echo "127.0.1.1 $NEW_HOSTNAME $NEW_HOSTNAME.localdomain" | tee -a /etc/hosts > /dev/null
 fi
 
 # Update /etc/hostname
-echo "$NEW_HOSTNAME" | sudo tee /etc/hostname > /dev/null
+echo "$NEW_HOSTNAME" | tee /etc/hostname > /dev/null
 
 # Apply hostname immediately
-sudo hostnamectl set-hostname "$NEW_HOSTNAME"
+hostnamectl set-hostname "$NEW_HOSTNAME"
 
 echo "[OK] Hostname updated."
 
