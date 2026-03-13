@@ -133,10 +133,9 @@ sudo sed -i '/^[[:space:]]*- 10\.1\.200\./d' "$NETPLAN_PATH"
 
 # C. Handle 'addresses' section
 # Check if 'addresses:' line exists
-if grep -q "^      addresses:" "$NETPLAN_PATH"; then
-    # Line exists, insert IP after it
-    NEW_ADDRESS="      - $TARGET_IP/23"
-    sudo sed -i "/^      addresses:/a $NEW_ADDRESS" "$NETPLAN_PATH"
+if grep -q "addresses:" "$NETPLAN_PATH"; then
+        # Insert IP after addresses line
+        sudo sed -i "/addresses:/a\        - $TARGET_IP/23" "$NETPLAN_PATH"
 else
     # Line does not exist, we need to insert it.
     # We insert 'addresses:' and the IP right after the 'dhcp4: no' line (or interface name if dhcp4 is missing)
