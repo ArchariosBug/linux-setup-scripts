@@ -132,15 +132,7 @@ sudo sed -i '/^[[:space:]]*- 10\.1\.200\./d' "$NETPLAN_PATH"
 sudo sed -i '/via: 10\.1\.200\.1/d' "$NETPLAN_PATH"
 sudo sed -i '/to: default/d' "$NETPLAN_PATH"
 
-# D. adding new default route
-if ! ip route | grep -q default; then
-    echo "Default route missing. Adding gateway $GATEWAY_IP ..."
-    sudo ip route add default via $GATEWAY_IP dev $INTERFACE_NAME
-else
-    echo "Default route already exists."
-fi
-
-# E. Handle 'addresses' section
+# D. Handle 'addresses' section
 # Check if 'addresses:' line exists
 if grep -q "^      addresses:" "$NETPLAN_PATH"; then
     # Line exists, insert IP after it
@@ -159,7 +151,6 @@ else
     echo "  -> Created 'addresses' section."
 fi
 
-
 echo "[OK] Netplan config updated with IP 10.1.200.$YYY/23"
 
 # 6. Apply Netplan
@@ -172,6 +163,15 @@ sudo netplan try --timeout 30 || {
 
 sudo netplan apply
 echo "[OK] Netplan applied successfully."
+
+# Adding new default route
+if ! ip route | grep -q default; then
+    echo "Default route missing. Adding gateway $GATEWAY_IP ..."
+    sudo ip route add default via $GATEWAY_IP dev $INTERFACE_NAME
+    echo "Added default route through $GATEWAY_IP"
+else
+    echo "Default route already exists."
+fi
 
 echo "=========================================="
 echo "Configuration Complete!"
