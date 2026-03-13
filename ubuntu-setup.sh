@@ -6,7 +6,7 @@ set -e
 # --- Configuration Variables ---
 # Change these if your interface name or netplan file name differs
 INTERFACE_NAME="eth0"
-NETPLAN_FILE="xxx"
+NETPLAN_FILE="50-cloud-init.yaml"
 NETPLAN_DIR="/etc/netplan/"
 SSH_CONFIG="/etc/ssh/sshd_config"
 CLOUD_INIT_FLAG="/etc/cloud/cloud-init.disabled"
@@ -107,6 +107,9 @@ network:
     $INTERFACE_NAME:
       dhcp4: no
       addresses: []
+      routes:
+        - to: default
+          via: $GATEWAY_IP
 EOF
 fi
 
@@ -128,11 +131,7 @@ fi
 # B. Remove OLD IP lines (Pattern: lines starting with spaces, dash, then 10.1.200)
 sudo sed -i '/^[[:space:]]*- 10\.1\.200\./d' "$NETPLAN_PATH"
 
-# C. Remove OLD Route lines
-sudo sed -i '/via: 10\.1\.200\.1/d' "$NETPLAN_PATH"
-sudo sed -i '/to: default/d' "$NETPLAN_PATH"
-
-# D. Handle 'addresses' section
+# C. Handle 'addresses' section
 # Check if 'addresses:' line exists
 if grep -q "^      addresses:" "$NETPLAN_PATH"; then
     # Line exists, insert IP after it
@@ -141,7 +140,6 @@ if grep -q "^      addresses:" "$NETPLAN_PATH"; then
 else
     # Line does not exist, we need to insert it.
     # We insert 'addresses:' and the IP right after the 'dhcp4: no' line (or interface name if dhcp4 is missing)
-    # Strategy: Insert after 'dhcp4: no'
     if grep -q "dhcp4: no" "$NETPLAN_PATH"; then
         sudo sed -i "/dhcp4: no/a\      addresses:\n        - $TARGET_IP/23" "$NETPLAN_PATH"
     else
@@ -149,6 +147,14 @@ else
         sudo sed -i "/$INTERFACE_NAME:/a\      dhcp4: no\n      addresses:\n        - $TARGET_IP/23" "$NETPLAN_PATH"
     fi
     echo "  -> Created 'addresses' section."
+fi
+
+# D. Ensure default route exists
+if grep -q "to: default" "$NETPLAN_PATH"; then
+    echo "  -> Default route already configured."
+else
+    sudo sed -i "/^      addresses:/a\      routes:\n        - to: default\n          via: 10.1.200.1" "$NETPLAN_PATH"
+    echo "  -> Added default route."
 fi
 
 echo "[OK] Netplan config updated with IP 10.1.200.$YYY/23"
@@ -165,13 +171,13 @@ sudo netplan apply
 echo "[OK] Netplan applied successfully."
 
 # Adding new default route
-if ! ip route | grep -q default; then
-    echo "Default route missing. Adding gateway $GATEWAY_IP ..."
-    sudo ip route add default via $GATEWAY_IP dev $INTERFACE_NAME
-    echo "Added default route through $GATEWAY_IP"
-else
-    echo "Default route already exists."
-fi
+#if ! ip route | grep -q default; then
+#    echo "Default route missing. Adding gateway $GATEWAY_IP ..."
+#    sudo ip route add default via $GATEWAY_IP dev $INTERFACE_NAME
+#    echo "Added default route through $GATEWAY_IP"
+#else
+#    echo "Default route already exists."
+#fi
 
 echo "=========================================="
 echo "Configuration Complete!"
